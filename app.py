@@ -1,67 +1,51 @@
-
 import streamlit as st
-import torch
-import torchvision.transforms as transforms
+import tensorflow as tf
 from PIL import Image
-from torchvision import models
-import cv2
+import numpy as np
+import os
 
-# Load the pre-trained VGG model
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-vgg = models.vgg16(pretrained=True)
-vgg = vgg.to(device)
-vgg.eval()
+st.write("""
+# Simple VGG16 Model Classifier
+""")
 
-# Preprocess the input image
-def preprocess_image(image):
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-    image = transform(image)
-    return image.unsqueeze(0)
+# Load the pre-trained model
+def load_model():
+    # model = tf.keras.models.load_model('best_model.h5')
+    model = tf.keras.models.load_model('./results_vgg/vgg_digits_best_model.h')
+    return model
 
-# Perform inference using the VGG model
-def predict(image):
-    with torch.no_grad():
-        image = image.to(device)
-        output = vgg(image)
-        probabilities = torch.nn.functional.softmax(output[0], dim=0)
-        return probabilities
+model = load_model()
 
-# Streamlit app
-def main():
-    st.title("VGG Model Image Classification")
-    st.write("Use the camera to capture an image and let the VGG model predict its class.")
+# Function to preprocess the image and make predictions
+def predict(image_path):
+    img = Image.open(image_path)
+    img = img.resize((228, 228))  # Resize the image to match the input size of the model
+    img = np.array(img) / 255.0  # Normalize the image pixel values to [0, 1]
+    img = np.expand_dims(img, axis=0)  # Add batch dimension
 
-    video_capture = cv2.VideoCapture(0)
+    # Make predictions using the model
+    predictions = model.predict(img)
+    predicted_class = tf.argmax(predictions, axis=1)[0].numpy()
+    confidence = tf.reduce_max(predictions, axis=1)[0]
 
-    if st.button("Capture"):
-        if video_capture.isOpened():
-            ret, frame = video_capture.read()
-            if ret:
-                # Convert the OpenCV frame to PIL format
-                image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                st.image(image, caption="Captured Image.", use_column_width=True)
+    return predicted_class, confidence.numpy()
 
-                # Perform prediction
-                preprocessed_image = preprocess_image(image)
-                probabilities = predict(preprocessed_image)
+def file_selector(folders):
+    filenames = []
+    for folder_path in folders:
+        folder_files = os.listdir(folder_path)
+        filenames.extend([os.path.join(folder_path, file) for file in folder_files])
+    
+    selected_filename = st.selectbox('Select your Image', filenames)
+    return selected_filename
 
-                # Get class labels (e.g., from ImageNet)
-                # Replace the labels below with the appropriate class labels for your model
-                class_labels = ["class1", "class2", "class3", ...]
+folders = ['./ASL Digits/test/0', './ASL Digits/test/1', './ASL Digits/test/2', './ASL Digits/test/3', './ASL Digits/test/4', './ASL Digits/test/5', './ASL Digits/test/6','./ASL Digits/test/7','./ASL Digits/test/8','./ASL Digits/test/9',]  # Add your folder paths here
+filename = file_selector(folders)
+st.write('You selected `%s`' % filename)
 
-                # Get the top predicted class
-                top_class_idx = torch.argmax(probabilities).item()
-                top_class_prob = probabilities[top_class_idx].item()
-
-                st.write(f"Prediction: {class_labels[top_class_idx]}")
-                st.write(f"Probability: {top_class_prob:.2f}")
-
-    # Release the camera when the app is closed
-    st.experimental_rerun()
-
-if __name__ == "__main__":
-    main()
+if filename:
+    img = Image.open(filename)
+    st.image(img, caption="Your Image", use_column_width=True)
+    st.write("Classifying...")
+    label_class, label_confidence = predict(filename)
+    st.write('The image is %d with %.2f%% probability' % (label_class, label_confidence * 100))
