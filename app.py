@@ -5,7 +5,7 @@ import numpy as np
 import os
 
 st.write("""
-# Simple VGG16 Model Classifier
+Sign Language Classification Model
 """)
 
 # Load the pre-trained model
@@ -29,22 +29,16 @@ def predict(image_path):
 
     return predicted_class, confidence.numpy()
 
-def file_selector(folders):
-    filenames = []
-    for folder_path in folders:
-        folder_files = os.listdir(folder_path)
-        filenames.extend([os.path.join(folder_path, file) for file in folder_files])
-    
-    selected_filename = st.selectbox('Select your Image', filenames)
-    return selected_filename
+def file_selector():
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+    return uploaded_file
 
-folders = ['./ASL Digits/test/0', './ASL Digits/test/1', './ASL Digits/test/2', './ASL Digits/test/3', './ASL Digits/test/4', './ASL Digits/test/5', './ASL Digits/test/6','./ASL Digits/test/7','./ASL Digits/test/8','./ASL Digits/test/9',]  # Add your folder paths here
-filename = file_selector(folders)
-st.write('You selected `%s`' % filename)
+uploaded_image = file_selector()
 
-if filename:
-    img = Image.open(filename)
+if uploaded_image is not None:
+    img = Image.open(uploaded_image)
     st.image(img, caption="Your Image", use_column_width=True)
     st.write("Classifying...")
-    label_class, label_confidence = predict(filename)
+    label_class, label_confidence = predict(uploaded_image)
     st.write('The image is %d with %.2f%% probability' % (label_class, label_confidence * 100))
+
